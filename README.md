@@ -1,4 +1,4 @@
-## 🎨 Pochoir Maker
+## 🎨 PochoirMaker
 
 PochoirMaker is a peculiar tool that helps you selectively transform any picture into a pure black & white cutout, stencil-style, better than any automated filter.
 
@@ -25,6 +25,8 @@ pip install opencv-python pillow numpy
 But I'm a lazy guy and I hate it when, after a few years, a useful script stops working because some dependency update broke it... So I compiled PochoirMaker into a sexy 59 MB .exe, thanks to PyInstaller. Anyone with a decent Windows PC can use the .exe, you don't need Python, there's nothing to install, it's all self-contained and portable.
 
 ### 🛠️ How to use
+
+*Foreword: The source picture you choose matters a lot. Although PochoirMaker helps getting the best contrast and clarity from complicated images, its magic won't always work on a bad source. You may also want to first remove or simplify the background and unimportant parts of the picture, using your favorite image editor. It can save some time and make your work in PochoirMaker easier.*
 
 On opening PochoirMaker you will be prompted to select an input file, then you will see the black & white filtered image (no, you can't zoom in or out – sorry about that). Try different values for **Simplification and Median** to stylize the shapes to your liking. My go-to setting is Simplification: 1 and Median: 3.
 
