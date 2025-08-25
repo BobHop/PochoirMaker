@@ -44,7 +44,7 @@ Press the [E] key to toggle **Eraser mode** 🔴 and remove parts of the masks �
 
 #### Source
 
-You may find the code of PochoirMaker is messy and unprofessional: that's totally normal. I'm not a developer and had ChatGPT churn it all out, following my directions (in French 🇫🇷 ). But the tool is fully functional, it doesn't crash and does what it's asked. And I made a cute icon for it!
+You may find the code of PochoirMaker messy and unprofessional: that's totally normal. I'm not a developer and had ChatGPT churn it all out, following my directions (in French 🇫🇷 ). But the tool is fully functional, it doesn't crash and does what it's asked. And I made a cute icon for it!
 
 If you feel like improving this tool, adding features like zoom in/out, undo/redo – please do so! I'm not claiming ownership on any of this and would love to see people use and improve it.
 
