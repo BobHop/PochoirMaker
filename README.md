@@ -6,6 +6,8 @@ Most photographs don't make good stencils right away because of their uneven lev
 
 PochoirMaker aims to let you guide the filtering by freezing parts of the image when they look best, then moving on with other parts at a different threshold value. This way you end up with a well-balanced black & white image, ready for a bit of cleaning and/or vectorizing.
 
+![Screenshot](PochoirMaker.png)
+
 #### Features
 
 - Import JPG, PNG, BMP, TIF images of any size (be reasonable though).
@@ -30,9 +32,15 @@ But I'm a lazy guy and I hate it when, after a few years, a useful script stops 
 
 On opening PochoirMaker you will be prompted to select an input file, then you will see the black & white filtered image (no, you can't zoom in or out – sorry about that). Try different values for **Simplification and Median** to stylize the shapes to your liking. My go-to setting is Simplification: 1 and Median: 3.
 
-Use the **right mouse button to pan** the viewport, use the **left mouse button to paint** a green mask that will freeze the covered areas. As soon as you change the Threshold value, your active mask (green) will be merged into the final mask (blue). You can **change the brush size** using the related slider.
+Use the **right mouse button to pan** the viewport, use the **left mouse button to paint** a green mask that will freeze the covered areas. As soon as you change the Threshold value, your <span style="color: green;">**active mask**</span> (green) will be merged into the <span style="color: blue;">**final mask**</span> (blue). You can **change the brush size** with the related slider.
 
 Press the [E] key to toggle **Eraser mode** and remove parts of the masks – that's as close to an Undo feature as you will get. Press the [S] key at any time to prompt a "Save As..." dialog box. The saved image is a PNG named after the input file + a "_pochoir" suffix and a version number; each time you save your work, the file name will be incremented. You are of course free to name it differently.
+
+**Note:** If you plan to use your stencil IRL, keep in mind that every white area should be connected to the main paper sheet ultimately. No floating white shapes! You want everything to be easy to cut out and paint.
+
+![Screenshot](PochoirMaker.gif)
+
+---
 
 #### Source
 
