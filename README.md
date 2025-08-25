@@ -36,7 +36,7 @@ Use the **right mouse button to pan** the viewport, use the **left mouse button 
 
 Press the [E] key to toggle **Eraser mode** and remove parts of the masks – that's as close to an Undo feature as you will get. Press the [S] key at any time to prompt a "Save As..." dialog box. The saved image is a PNG named after the input file + a "_pochoir" suffix and a version number; each time you save your work, the file name will be incremented. You are of course free to name it differently.
 
-**Note:** If you plan to use your stencil IRL, keep in mind that every white area should be connected to the main paper sheet ultimately. No floating white shapes! You want everything to be easy to cut out and paint.
+*Note: If you plan to use your stencil IRL, keep in mind that every white area should be connected to the main paper sheet ultimately. No floating white shapes! You want everything to be easy to cut out and paint. The example I made is VERY BAD on that matter.*
 
 ![Screenshot](PochoirMaker.gif)
 
