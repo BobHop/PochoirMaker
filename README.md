@@ -14,6 +14,7 @@ PochoirMaker aims to let you guide the filtering by freezing parts of the image 
 - Interactive Threshold filter to pick just the right level from 0 to 255.
 - Optional Simplification and Median filters to remove noise and small details.
 - Mask painting to freeze specific parts of the image when they look best.
+- Awesome Cutout filter to give your image that final stencil touch.
 - Ugly and cumbersome UI that can't be resized.
 
 #### Prerequisites
@@ -30,7 +31,7 @@ But I'm a lazy guy and I hate it when, after a few years, a useful script stops 
 
 *Foreword: The source picture you choose matters a lot. Although PochoirMaker helps getting the best contrast and clarity from complicated images, its magic won't always work on a bad source. You may also want to first remove or simplify the background and unimportant parts of the picture, using your favorite image editor. It can save some time and make your work in PochoirMaker easier.*
 
-On opening PochoirMaker you will be prompted to select an input file, then you will see the black & white filtered image (no, you can't zoom in or out – sorry about that). Try different values for **Simplification and Median** to stylize the shapes to your liking. My go-to setting is Simplification: 1 and Median: 3.
+On opening PochoirMaker you will be prompted to select an input file, then you will see the black & white filtered image (no, you can't zoom in or out – sorry about that). Try different values for **Simplification and Median** to stylize the shapes to your liking.
 
 Use the **right mouse button to pan** the viewport, use the **left mouse button to paint** a green mask that will freeze the covered areas. As soon as you change the Threshold value, your active mask 🟢 will be merged into the final mask 🔵. You can **change the brush size** with the related slider.
 
