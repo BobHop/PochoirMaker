@@ -15,6 +15,7 @@ PochoirMaker aims to let you guide the filtering by freezing parts of the image 
 - Optional Simplification and Median filters to remove noise and small details.
 - Mask painting to freeze specific parts of the image when they look best.
 - Awesome Cutout filter to give your image that final stencil touch.
+- Optional source image overlay for comparisons purpose.
 - Ugly and cumbersome UI that can't be resized.
 
 #### Prerequisites
