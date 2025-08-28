@@ -16,20 +16,14 @@ import sys, os
 import tkinter as tk
 from tkinter import filedialog
 
-# =============================
-# Pochoir editor — zones figées par changement de Threshold
-# Version avec boîtes de dialogue Tkinter (Open… / Save As…)
-# - Fenêtre viewport 1024x600 (crop strict, JAMAIS de resize/écrasement)
-# - Clic gauche = peindre zone "en attente" (vert 50%)
-#   → ces zones deviennent figées (bleu 50%) UNIQUEMENT quand la valeur
-#     du curseur Threshold change. Elles ne bougent plus ensuite.
-# - Clic droit + drag = panning du viewport
-# - [E] = bascule pinceau/gomme (preview vert ⇄ rouge)
-# - [S] = Save As… (sans overlay), [C] = clear (tout), [Esc]/[Q] = quitter
-# - Curseurs : Threshold / Simplify / Median / Isolate(-1..1) / Brush (4–64 px)
-# =============================
+VIEW_W, VIEW_H = 1024, 768
 
-VIEW_W, VIEW_H = 1024, 600
+# ---- Cutout tuning ----
+CUTOUT_BASE = 1.0 / 32000.0   # échelle globale (augmente si l'effet est trop faible)
+CUTOUT_W_ARC = 0.5           # poids du périmètre
+CUTOUT_W_AREA = 16.0          # poids de sqrt(aire) (monte pour plus d'effet sur les zones complexes)
+CUTOUT_MIN_EPS = 0.0         # epsilon mini (0 à 0.5)
+CUTOUT_MAX_FRAC = 0.05       # epsilon <= 5% du périmètre
 
 # --- Lecture robuste (espaces, accents, etc.) ---
 def safe_imread(filepath):
@@ -99,16 +93,27 @@ mouse_pos = None   # pour preview
 erase_mode = False # toggle avec touche 'E'
 
 # --------- Fenêtre & trackbars ---------
-# AUTOSIZE pour qu'OpenCV n'essaye JAMAIS de rescales l'image affichée
+
+# Fenêtres : une pour les curseurs, une pour l'image
+cv2.namedWindow("Controls", cv2.WINDOW_NORMAL)
+# AUTOSIZE pour qu'OpenCV n'essaye JAMAIS de rescale l'image affichée
 cv2.namedWindow("Pochoir", cv2.WINDOW_AUTOSIZE)
-cv2.createTrackbar("Threshold", "Pochoir", 128, 255, lambda v: None)
-cv2.createTrackbar("Simplify",  "Pochoir", 1,   20,  lambda v: None)
-cv2.createTrackbar("Median",    "Pochoir", 0,   10,  lambda v: None)
-cv2.createTrackbar("Isolate",   "Pochoir", 1,   2,   lambda v: None)  # 0..2 → -1..1
-cv2.createTrackbar("Brush",     "Pochoir", 16,  64,  lambda v: None)  # clamp >=4
+
+# Dimensions + placement à l'écran
+cv2.resizeWindow("Controls", 480, 768)   # panneau vertical
+cv2.moveWindow("Controls", 64, 64)
+cv2.resizeWindow("Pochoir", 1024, 768)   # viewport principal
+cv2.moveWindow("Pochoir", 544, 64)
+
+cv2.createTrackbar("Threshold", "Controls", 128, 255, lambda v: None)
+cv2.createTrackbar("Median",    "Controls",   2,   10,  lambda v: None)
+cv2.createTrackbar("Simplify",  "Controls",   2,   10,  lambda v: None)
+cv2.createTrackbar("Brush",     "Controls",  16,   64,  lambda v: None)
+cv2.createTrackbar("Source",    "Controls",   0,   10,  lambda v: None)  
+cv2.createTrackbar("Cutout",    "Controls",   0,   50,  lambda v: None)
 
 # Seuil précédent (pour déclencher le figé au changement)
-last_threshold = cv2.getTrackbarPos("Threshold", "Pochoir")
+last_threshold = cv2.getTrackbarPos("Threshold", "Controls")
 
 # ---------- Fonctions ----------
 
@@ -116,43 +121,60 @@ def read_trackbars():
     if cv2.getWindowProperty("Pochoir", cv2.WND_PROP_VISIBLE) < 1:
         return None
     try:
-        t  = cv2.getTrackbarPos("Threshold", "Pochoir")
-        s  = cv2.getTrackbarPos("Simplify",  "Pochoir")
-        m  = cv2.getTrackbarPos("Median",    "Pochoir")
-        iso_raw = cv2.getTrackbarPos("Isolate",   "Pochoir")
-        b  = max(4, cv2.getTrackbarPos("Brush",     "Pochoir"))
+        t  = cv2.getTrackbarPos("Threshold", "Controls")
+        m  = cv2.getTrackbarPos("Median", "Controls")
+        s  = cv2.getTrackbarPos("Simplify", "Controls")
+        b  = max(4, cv2.getTrackbarPos("Brush", "Controls"))
+        cutout = cv2.getTrackbarPos("Cutout", "Controls")
     except cv2.error:
         # Si on essaie de lire un trackbar alors que la fenêtre est fermée
         return None
-    return t, s, m, (iso_raw - 1), b  # isolate ∈ {-1,0,1}
+    return t, m, s, b, cutout
 
 
-def apply_filters(gray_img, threshold, simplify, median, isolate):
+def apply_filters(gray_img, threshold, median, simplify, cutout):
     # Seuil binaire (sur niveaux de gris d'origine)
     _, bw = cv2.threshold(gray_img, threshold, 255, cv2.THRESH_BINARY)
-
-    # Simplification (morpho ellipsoïde) après seuil
-    if simplify > 0:
-        k = 2 * simplify + 1
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
-        bw = cv2.morphologyEx(bw, cv2.MORPH_OPEN,  kernel)
-        bw = cv2.morphologyEx(bw, cv2.MORPH_CLOSE, kernel)
 
     # Médiane (arrondir contours)
     if median > 0:
         bw = cv2.medianBlur(bw, 2 * median + 1)
 
-    # Isolement du plus grand contour (optionnel)
-    if isolate != 0:
-        contours, _ = cv2.findContours(bw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if contours:
-            c = max(contours, key=cv2.contourArea)
-            m = np.zeros_like(bw)
-            cv2.drawContours(m, [c], -1, 255, -1)
-            if isolate == 1:      # garder sujet (fond blanc)
-                bw = cv2.bitwise_and(bw, m)
-            elif isolate == -1:   # garder fond (sujet blanc)
-                bw = cv2.bitwise_and(bw, cv2.bitwise_not(m))
+    # Simplification (morpho cruciforme)
+    if simplify > 0:
+        k = 2 * simplify + 1
+        kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (k, k))
+        bw = cv2.morphologyEx(bw, cv2.MORPH_OPEN,  kernel)
+        bw = cv2.morphologyEx(bw, cv2.MORPH_CLOSE, kernel)
+        bw = cv2.medianBlur(bw, 2 * median + 1) # deuxième passe de médiane, en douce :)
+
+    # Applique une simplification des contours avec approxPolyDP
+    if cutout > 0:
+        contours, _ = cv2.findContours(bw, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        cutout_img = np.zeros_like(bw)
+        approximated_contours = []
+
+        for cnt in contours:
+            arc  = cv2.arcLength(cnt, True)
+            area = cv2.contourArea(cnt)
+
+            # facteur combinant périmètre et taille (aire pondérée par sqrt pour ne pas dominer)
+            combo = CUTOUT_W_ARC * arc + CUTOUT_W_AREA * (np.sqrt(max(area, 0.0)))
+
+            # epsilon avant bornes
+            eps = cutout * CUTOUT_BASE * combo
+
+            # bornes de sécurité
+            eps = max(CUTOUT_MIN_EPS, min(eps, CUTOUT_MAX_FRAC * arc))
+
+            approx = cv2.approxPolyDP(cnt, eps, True)
+            if len(approx) < 3:
+                approx = cnt  # garde le contour si la simplification devient dégénérée
+
+            approximated_contours.append(approx)
+
+        cv2.drawContours(cutout_img, approximated_contours, -1, 255, -1)
+        bw = cutout_img
 
     return bw
 
@@ -162,9 +184,9 @@ IMG_GRAY = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 # Pour geler au bon moment, on garde le rendu de la frame précédente
 # (correspondant à last_threshold)
 last_output = apply_filters(IMG_GRAY, last_threshold,
-                            cv2.getTrackbarPos("Simplify", "Pochoir"),
-                            cv2.getTrackbarPos("Median", "Pochoir"),
-                            cv2.getTrackbarPos("Isolate", "Pochoir") - 1)
+                            cv2.getTrackbarPos("Median", "Controls"),
+                            cv2.getTrackbarPos("Simplify", "Controls"),
+                            cv2.getTrackbarPos("Cutout", "Controls"))
 
 
 def clamp(val, lo, hi):
@@ -204,7 +226,7 @@ def mouse_cb(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
         is_drawing = True
         last_draw_pt = (ix, iy)
-        brush = max(4, cv2.getTrackbarPos("Brush", "Pochoir"))
+        brush = max(4, cv2.getTrackbarPos("Brush", "Controls"))
         if erase_mode:
             # gomme: efface pending + frozen + frozen_result
             erase_circle(mask_pending, last_draw_pt, brush)
@@ -215,7 +237,7 @@ def mouse_cb(event, x, y, flags, param):
 
     elif event == cv2.EVENT_MOUSEMOVE:
         if is_drawing:
-            brush = max(4, cv2.getTrackbarPos("Brush", "Pochoir"))
+            brush = max(4, cv2.getTrackbarPos("Brush", "Controls"))
             if erase_mode:
                 cv2.line(mask_pending, last_draw_pt, (ix, iy), 0, 2*brush)
                 cv2.line(mask_frozen,  last_draw_pt, (ix, iy), 0, 2*brush)
@@ -250,7 +272,7 @@ while True:
     vals = read_trackbars()
     if vals is None:
         break  # on quitte proprement si la fenêtre n'existe plus
-    thresh, simpl, med, iso, brush = vals
+    thresh, med, simpl, brush, cutout = vals
 
     # Si le threshold change → figer ce qui est en pending avec le rendu précédent
     if thresh != last_threshold:
@@ -265,7 +287,7 @@ while True:
         last_threshold = thresh
 
     # Calculer le rendu courant avec le threshold actuel
-    current_output = apply_filters(IMG_GRAY, thresh, simpl, med, iso)
+    current_output = apply_filters(IMG_GRAY, thresh, med, simpl, cutout)
     # Mettre à jour last_output pour le prochain cycle
     last_output = current_output.copy()
 
@@ -312,7 +334,26 @@ while True:
             cv2.circle(overlay, (px, py), brush, color, -1)
             canvas = cv2.addWeighted(overlay, 0.3, canvas, 0.7, 0)
 
-    cv2.imshow("Pochoir", canvas)
+    # --- Overlay progressif de l'original couleur, aligné sur le viewport ---
+
+    # Lire le slider Source (0/1/2 -> alpha 0.0/0.5/1.0)
+    overlay_val = cv2.getTrackbarPos("Source", "Controls")
+    alpha = overlay_val / 10.0
+
+    if alpha > 0:
+        # Prendre le même crop dans l'image couleur d'origine
+        color_crop = img[y1:y2, x1:x2]  # mêmes bornes que pour 'crop'
+
+        # Construire un "img_canvas" de la même taille que 'canvas' et y coller le crop en haut-gauche
+        img_canvas = np.zeros_like(canvas)  # (VIEW_H x VIEW_W x 3)
+        img_canvas[:color_crop.shape[0], :color_crop.shape[1]] = color_crop
+
+        # 'canvas' est déjà en BGR
+        display = cv2.addWeighted(canvas, 1 - alpha, img_canvas, alpha, 0)
+    else:
+        display = canvas
+
+    cv2.imshow("Pochoir", display)
 
     # Si l'utilisateur ferme la fenêtre via la croix, on quitte proprement
     if cv2.getWindowProperty("Pochoir", cv2.WND_PROP_VISIBLE) < 1:
